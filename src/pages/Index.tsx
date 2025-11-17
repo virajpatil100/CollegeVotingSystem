@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { VotingCard } from "@/components/voting/VotingCard";
 import { ResultsCard } from "@/components/results/ResultsCard";
-import { LogOut, Shield } from "lucide-react";
+import { CreateElectionDialog } from "@/components/admin/CreateElectionDialog";
+import { MyElectionsSection } from "@/components/host/MyElectionsSection";
+import { LogOut, Shield, Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
@@ -17,6 +19,7 @@ interface Profile {
 export default function Index() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [elections, setElections] = useState<any[]>([]);
+  const [myElections, setMyElections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -41,6 +44,7 @@ export default function Index() {
     if (profileData) {
       setProfile(profileData);
       await loadElections(profileData);
+      await loadMyElections(profileData);
     }
     
     setLoading(false);
@@ -56,7 +60,10 @@ export default function Index() {
           table: "votes",
         },
         () => {
-          if (profileData) loadElections(profileData);
+          if (profileData) {
+            loadElections(profileData);
+            loadMyElections(profileData);
+          }
         }
       )
       .subscribe();
@@ -106,6 +113,49 @@ export default function Index() {
     }
   };
 
+  const loadMyElections = async (userProfile: Profile) => {
+    const { data: myElectionsData } = await supabase
+      .from("elections")
+      .select(`
+        *,
+        candidates (*),
+        votes (*),
+        election_voters (*)
+      `)
+      .eq("created_by", userProfile.id)
+      .order("created_at", { ascending: false });
+
+    if (myElectionsData) {
+      // Get all profiles for voters
+      const { data: allProfiles } = await supabase
+        .from("profiles")
+        .select("id, zprn_id, name");
+
+      const electionsWithVoterStatus = myElectionsData.map((election) => {
+        const voterStatuses = election.election_voters.map((ev: any) => {
+          const profile = allProfiles?.find((p) => p.zprn_id === ev.zprn_id);
+          const hasVoted = election.votes.some((vote: any) => {
+            const voterProfile = allProfiles?.find((p) => p.id === vote.voter_id);
+            return voterProfile?.zprn_id === ev.zprn_id;
+          });
+
+          return {
+            zprn_id: ev.zprn_id,
+            name: profile?.name,
+            has_voted: hasVoted,
+          };
+        });
+
+        return {
+          ...election,
+          voterStatuses,
+        };
+      });
+
+      setMyElections(electionsWithVoterStatus);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/auth");
@@ -145,19 +195,20 @@ export default function Index() {
           </div>
         </div>
 
-        {elections.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">
-              No active elections available for you at the moment.
-            </p>
-          </div>
-        ) : (
-          <Tabs defaultValue="vote" className="w-full">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-              <TabsTrigger value="vote">Cast Vote</TabsTrigger>
-              <TabsTrigger value="results">View Results</TabsTrigger>
-            </TabsList>
-            <TabsContent value="vote" className="mt-6">
+        <Tabs defaultValue="vote" className="w-full">
+          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-3">
+            <TabsTrigger value="vote">Cast Vote</TabsTrigger>
+            <TabsTrigger value="results">View Results</TabsTrigger>
+            <TabsTrigger value="my-elections">My Elections</TabsTrigger>
+          </TabsList>
+          <TabsContent value="vote" className="mt-6">
+            {elections.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">
+                  No active elections available for you at the moment.
+                </p>
+              </div>
+            ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {elections.map((election) => (
                   <VotingCard
@@ -171,8 +222,16 @@ export default function Index() {
                   />
                 ))}
               </div>
-            </TabsContent>
-            <TabsContent value="results" className="mt-6">
+            )}
+          </TabsContent>
+          <TabsContent value="results" className="mt-6">
+            {elections.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">
+                  No active elections available for you at the moment.
+                </p>
+              </div>
+            ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {elections.map((election) => {
                   const candidatesWithVotes = election.candidates.map((candidate: any) => ({
@@ -190,9 +249,27 @@ export default function Index() {
                   );
                 })}
               </div>
-            </TabsContent>
-          </Tabs>
-        )}
+            )}
+          </TabsContent>
+          
+          <TabsContent value="my-elections" className="mt-6">
+            <div className="mb-6 flex justify-end">
+              {profile && (
+                <CreateElectionDialog 
+                  userId={profile.id} 
+                  onElectionCreated={() => {
+                    loadElections(profile);
+                    loadMyElections(profile);
+                  }} 
+                />
+              )}
+            </div>
+            <MyElectionsSection 
+              elections={myElections}
+              onElectionDeleted={() => profile && loadMyElections(profile)}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
