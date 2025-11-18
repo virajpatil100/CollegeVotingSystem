@@ -10,8 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
   id: string;
-  role: string;
   zprn_id: string;
+  name: string;
 }
 
 export default function AdminDashboard() {
@@ -39,7 +39,18 @@ export default function AdminDashboard() {
       .eq("id", session.user.id)
       .single();
 
-    if (!profileData || profileData.role !== "admin") {
+    if (!profileData) {
+      navigate("/auth");
+      return;
+    }
+
+    // Check admin role using secure function
+    const { data: isAdmin } = await supabase.rpc("has_role", {
+      _user_id: session.user.id,
+      _role: "admin",
+    });
+
+    if (!isAdmin) {
       toast({
         title: "Access Denied",
         description: "You don't have admin privileges",
@@ -79,42 +90,41 @@ export default function AdminDashboard() {
       .from("elections")
       .select(`
         *,
-        candidates (*),
-        votes (*),
-        election_voters (*)
+        candidates (*)
       `)
       .order("created_at", { ascending: false });
 
     if (electionsData) {
-      const electionsWithVoterStatus = await Promise.all(
+      const electionsWithData = await Promise.all(
         electionsData.map(async (election) => {
-          // Get all profiles for voters in this election
-          const { data: allProfiles } = await supabase
-            .from("profiles")
-            .select("id, zprn_id, name");
+          // Get voter turnout using secure function
+          const { data: voterStatuses } = await supabase.rpc("get_voter_turnout", {
+            election_uuid: election.id,
+          });
 
-          const voterStatuses = election.election_voters.map((ev: any) => {
-            const profile = allProfiles?.find((p) => p.zprn_id === ev.zprn_id);
-            const hasVoted = election.votes.some((vote: any) => {
-              const voterProfile = allProfiles?.find((p) => p.id === vote.voter_id);
-              return voterProfile?.zprn_id === ev.zprn_id;
-            });
+          // Get aggregated results using secure function
+          const { data: results } = await supabase.rpc("get_election_results", {
+            election_uuid: election.id,
+          });
 
+          // Map results to candidates with vote counts
+          const candidatesWithVotes = election.candidates.map((candidate: any) => {
+            const voteData = results?.find((r: any) => r.candidate_id === candidate.id);
             return {
-              zprn_id: ev.zprn_id,
-              name: profile?.name,
-              has_voted: hasVoted,
+              ...candidate,
+              vote_count: voteData?.vote_count || 0,
             };
           });
 
           return {
             ...election,
-            voterStatuses,
+            candidates: candidatesWithVotes,
+            voterStatuses: voterStatuses || [],
           };
         })
       );
 
-      setElections(electionsWithVoterStatus);
+      setElections(electionsWithData);
     }
   };
 
