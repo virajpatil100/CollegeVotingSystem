@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 interface Candidate {
   id: string;
   name: string;
-  vote_count: number;
+  voteCount: number;
 }
 
 interface ResultsCardProps {
@@ -18,8 +18,8 @@ interface ResultsCardProps {
 }
 
 export const ResultsCard = ({ election, candidates, totalVotes }: ResultsCardProps) => {
-  const sortedCandidates = [...candidates].sort((a, b) => b.vote_count - a.vote_count);
-  const winningVotes = sortedCandidates[0]?.vote_count || 0;
+  const sortedCandidates = [...candidates].sort((a, b) => b.voteCount - a.voteCount);
+  const winningVotes = sortedCandidates[0]?.voteCount || 0;
 
   return (
     <Card className="shadow-md">
@@ -31,8 +31,8 @@ export const ResultsCard = ({ election, candidates, totalVotes }: ResultsCardPro
       </CardHeader>
       <CardContent className="space-y-4">
         {sortedCandidates.map((candidate, index) => {
-          const percentage = totalVotes > 0 ? (candidate.vote_count / totalVotes) * 100 : 0;
-          const isWinning = candidate.vote_count === winningVotes && totalVotes > 0;
+          const percentage = totalVotes > 0 ? (candidate.voteCount / totalVotes) * 100 : 0;
+          const isWinning = candidate.voteCount === winningVotes && totalVotes > 0;
           
           return (
             <div key={candidate.id} className="space-y-2">
@@ -51,7 +51,7 @@ export const ResultsCard = ({ election, candidates, totalVotes }: ResultsCardPro
               </div>
               <Progress value={percentage} className="h-3" />
               <p className="text-xs text-muted-foreground">
-                {candidate.vote_count} {candidate.vote_count === 1 ? "vote" : "votes"}
+                {candidate.voteCount} {candidate.voteCount === 1 ? "vote" : "votes"}
               </p>
             </div>
           );
