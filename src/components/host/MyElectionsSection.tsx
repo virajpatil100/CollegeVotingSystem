@@ -55,9 +55,13 @@ export const MyElectionsSection = ({ elections, onElectionDeleted }: MyElections
   return (
     <div className="space-y-8">
       {elections.map((election) => {
+        // Calculate total votes from candidate vote_count
+        const totalVotes = election.candidates.reduce((sum: number, c: any) => sum + (c.vote_count || 0), 0);
+
+        // Map candidates to expected format for ResultsCard
         const candidatesWithVotes = election.candidates.map((candidate: any) => ({
           ...candidate,
-          voteCount: election.votes.filter((v: any) => v.candidate_id === candidate.id).length,
+          vote_count: candidate.vote_count || 0,
         }));
 
         return (
@@ -74,7 +78,7 @@ export const MyElectionsSection = ({ elections, onElectionDeleted }: MyElections
                       {election.is_active ? "Active" : "Inactive"}
                     </Badge>
                     <Badge variant="outline">
-                      {election.votes.length} votes
+                      {totalVotes} votes
                     </Badge>
                   </div>
                 </div>
@@ -93,7 +97,7 @@ export const MyElectionsSection = ({ elections, onElectionDeleted }: MyElections
                 <ResultsCard
                   election={election}
                   candidates={candidatesWithVotes}
-                  totalVotes={election.votes.length}
+                  totalVotes={totalVotes}
                 />
                 <VoterTurnoutCard
                   election={election}

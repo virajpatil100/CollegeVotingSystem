@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
   id: string;
-  role: string;
   zprn_id: string;
   name: string;
 }
@@ -21,6 +20,7 @@ export default function Index() {
   const [elections, setElections] = useState<any[]>([]);
   const [myElections, setMyElections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +43,14 @@ export default function Index() {
 
     if (profileData) {
       setProfile(profileData);
+      
+      // Check admin role using secure function
+      const { data: adminStatus } = await supabase.rpc("has_role", {
+        _user_id: session.user.id,
+        _role: "admin",
+      });
+      setIsAdmin(!!adminStatus);
+      
       await loadElections(profileData);
       await loadMyElections(profileData);
     }
@@ -93,22 +101,32 @@ export default function Index() {
       .from("elections")
       .select(`
         *,
-        candidates (*),
-        votes (*)
+        candidates (*)
       `)
       .in("id", electionIds)
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
     if (electionsData) {
-      const electionsWithVoteStatus = electionsData.map((election) => {
-        const userVote = election.votes.find((v: any) => v.voter_id === userProfile.id);
-        return {
-          ...election,
-          hasVoted: !!userVote,
-          votedCandidateId: userVote?.candidate_id,
-        };
-      });
+      const electionsWithVoteStatus = await Promise.all(
+        electionsData.map(async (election) => {
+          // Check if user has voted using secure function
+          const { data: hasVoted } = await supabase.rpc("has_user_voted", {
+            election_uuid: election.id,
+          });
+
+          // Get the candidate they voted for (if any) using secure function
+          const { data: votedCandidateId } = await supabase.rpc("get_user_vote", {
+            election_uuid: election.id,
+          });
+
+          return {
+            ...election,
+            hasVoted: !!hasVoted,
+            votedCandidateId,
+          };
+        })
+      );
       setElections(electionsWithVoteStatus);
     }
   };
@@ -118,41 +136,42 @@ export default function Index() {
       .from("elections")
       .select(`
         *,
-        candidates (*),
-        votes (*),
-        election_voters (*)
+        candidates (*)
       `)
       .eq("created_by", userProfile.id)
       .order("created_at", { ascending: false });
 
     if (myElectionsData) {
-      // Get all profiles for voters
-      const { data: allProfiles } = await supabase
-        .from("profiles")
-        .select("id, zprn_id, name");
+      const electionsWithData = await Promise.all(
+        myElectionsData.map(async (election) => {
+          // Get voter turnout using secure function
+          const { data: voterStatuses } = await supabase.rpc("get_voter_turnout", {
+            election_uuid: election.id,
+          });
 
-      const electionsWithVoterStatus = myElectionsData.map((election) => {
-        const voterStatuses = election.election_voters.map((ev: any) => {
-          const profile = allProfiles?.find((p) => p.zprn_id === ev.zprn_id);
-          const hasVoted = election.votes.some((vote: any) => {
-            const voterProfile = allProfiles?.find((p) => p.id === vote.voter_id);
-            return voterProfile?.zprn_id === ev.zprn_id;
+          // Get aggregated results using secure function
+          const { data: results } = await supabase.rpc("get_election_results", {
+            election_uuid: election.id,
+          });
+
+          // Map results to candidates with vote counts
+          const candidatesWithVotes = election.candidates.map((candidate: any) => {
+            const voteData = results?.find((r: any) => r.candidate_id === candidate.id);
+            return {
+              ...candidate,
+              vote_count: voteData?.vote_count || 0,
+            };
           });
 
           return {
-            zprn_id: ev.zprn_id,
-            name: profile?.name,
-            has_voted: hasVoted,
+            ...election,
+            candidates: candidatesWithVotes,
+            voterStatuses: voterStatuses || [],
           };
-        });
+        })
+      );
 
-        return {
-          ...election,
-          voterStatuses,
-        };
-      });
-
-      setMyElections(electionsWithVoterStatus);
+      setMyElections(electionsWithData);
     }
   };
 
@@ -186,7 +205,7 @@ export default function Index() {
               <BarChart3 className="w-4 h-4 mr-2" />
               Candidate Results
             </Button>
-            {profile?.role === "admin" && (
+            {isAdmin && (
               <Button variant="outline" onClick={() => navigate("/admin")}>
                 <Shield className="w-4 h-4 mr-2" />
                 Admin Panel
