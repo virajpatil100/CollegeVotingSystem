@@ -6,7 +6,7 @@ import { VotingCard } from "@/components/voting/VotingCard";
 import { ResultsCard } from "@/components/results/ResultsCard";
 import { CreateElectionDialog } from "@/components/admin/CreateElectionDialog";
 import { MyElectionsSection } from "@/components/host/MyElectionsSection";
-import { LogOut, Shield, Plus } from "lucide-react";
+import { LogOut, Shield, Plus, BarChart3 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Profile {
@@ -181,7 +181,11 @@ export default function Index() {
               </p>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" onClick={() => navigate("/candidate-results")}>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Candidate Results
+            </Button>
             {profile?.role === "admin" && (
               <Button variant="outline" onClick={() => navigate("/admin")}>
                 <Shield className="w-4 h-4 mr-2" />
