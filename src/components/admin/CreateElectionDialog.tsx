@@ -25,21 +25,21 @@ export const CreateElectionDialog = ({ userId, onElectionCreated }: CreateElecti
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [candidates, setCandidates] = useState<Array<{ name: string; description: string }>>([
-    { name: "", description: "" },
+  const [candidates, setCandidates] = useState<Array<{ name: string; description: string; uniqueId: string }>>([
+    { name: "", description: "", uniqueId: "" },
   ]);
   const [voterIds, setVoterIds] = useState<string[]>([""]);
   const { toast } = useToast();
 
   const addCandidate = () => {
-    setCandidates([...candidates, { name: "", description: "" }]);
+    setCandidates([...candidates, { name: "", description: "", uniqueId: "" }]);
   };
 
   const removeCandidate = (index: number) => {
     setCandidates(candidates.filter((_, i) => i !== index));
   };
 
-  const updateCandidate = (index: number, field: "name" | "description", value: string) => {
+  const updateCandidate = (index: number, field: "name" | "description" | "uniqueId", value: string) => {
     const updated = [...candidates];
     updated[index][field] = value;
     setCandidates(updated);
@@ -112,6 +112,7 @@ export const CreateElectionDialog = ({ userId, onElectionCreated }: CreateElecti
             election_id: election.id,
             name: c.name.trim(),
             description: c.description.trim() || null,
+            unique_id: c.uniqueId.trim() || null,
           }))
         );
 
@@ -137,7 +138,7 @@ export const CreateElectionDialog = ({ userId, onElectionCreated }: CreateElecti
       setOpen(false);
       setTitle("");
       setDescription("");
-      setCandidates([{ name: "", description: "" }]);
+      setCandidates([{ name: "", description: "", uniqueId: "" }]);
       setVoterIds([""]);
       onElectionCreated();
     } catch (error: any) {
@@ -189,28 +190,35 @@ export const CreateElectionDialog = ({ userId, onElectionCreated }: CreateElecti
           <div className="space-y-2">
             <Label>Candidates</Label>
             {candidates.map((candidate, index) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  placeholder="Candidate name"
-                  value={candidate.name}
-                  onChange={(e) => updateCandidate(index, "name", e.target.value)}
-                  className="flex-1"
-                />
+              <div key={index} className="space-y-2 p-4 border rounded-lg">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Candidate name"
+                    value={candidate.name}
+                    onChange={(e) => updateCandidate(index, "name", e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="Unique ID (for candidate to check votes)"
+                    value={candidate.uniqueId}
+                    onChange={(e) => updateCandidate(index, "uniqueId", e.target.value)}
+                    className="flex-1"
+                  />
+                  {candidates.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeCandidate(index)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
                 <Input
                   placeholder="Description (optional)"
                   value={candidate.description}
                   onChange={(e) => updateCandidate(index, "description", e.target.value)}
-                  className="flex-1"
                 />
-                {candidates.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeCandidate(index)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
               </div>
             ))}
             <Button variant="outline" size="sm" onClick={addCandidate}>

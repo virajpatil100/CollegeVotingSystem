@@ -21,6 +21,7 @@ export type Database = {
           election_id: string
           id: string
           name: string
+          unique_id: string | null
         }
         Insert: {
           created_at?: string
@@ -28,6 +29,7 @@ export type Database = {
           election_id: string
           id?: string
           name: string
+          unique_id?: string | null
         }
         Update: {
           created_at?: string
@@ -35,6 +37,7 @@ export type Database = {
           election_id?: string
           id?: string
           name?: string
+          unique_id?: string | null
         }
         Relationships: [
           {
